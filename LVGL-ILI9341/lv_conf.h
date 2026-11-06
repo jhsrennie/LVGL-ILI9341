@@ -790,7 +790,6 @@
  *============================================================================*/
 
 /** Logging */
-/** RATTUS */
 #define LV_USE_LOG 1
 
 #if LV_USE_LOG
@@ -803,8 +802,7 @@
  *  - LV_LOG_LEVEL_USER: only logs added by the user
  *  - LV_LOG_LEVEL_NONE: nothing is logged
  */
-/* #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN */
-#define LV_LOG_LEVEL LV_LOG_LEVEL_TRACE
+#define LV_LOG_LEVEL LV_LOG_LEVEL_INFO
 
 /** If not set, the user needs to register a callback with lv_log_register_print_cb(). */
 #define LV_LOG_PRINTF 0
@@ -1600,19 +1598,17 @@
 #define LV_USE_FT81X 0
 
 /** Display and touch driver built on the LovyanGFX C++ library, which must be available in the build. */
-/** RATTUS */
 #define LV_USE_LOVYAN_GFX 0
 
 #if LV_USE_LOVYAN_GFX
 /** Header for LovyanGFX user configuration */
-#define LV_LGFX_USER_INCLUDE "LovyanGFX_User.h"
+#define LV_LGFX_USER_INCLUDE "lv_lgfx_user.hpp"
 
 #endif /*LV_USE_LOVYAN_GFX*/
 
 /** Driver for LCD devices connected via SPI or parallel port.
  *  Use it if your LCD controller is not listed among the dedicated drivers below.
  */
-/** RATTUS */
 #define LV_USE_GENERIC_MIPI 1
 
 /** ST7735
@@ -1637,7 +1633,6 @@
  *
  *  Enable: LV_USE_GENERIC_MIPI
  */
-/** RATTUS */
 #define LV_USE_ILI9341 1
 
 /** NV3007
@@ -1666,7 +1661,6 @@
 #endif /*!LV_USE_DRAW_DMA2D*/
 
 /** Display driver built on the TFT_eSPI Arduino library, which must be available in the build. */
-/** RATTUS */
 #define LV_USE_TFT_ESPI 0
 
 /** Read touchscreen, mouse and keyboard input from Linux /dev/input event devices. */

@@ -31,52 +31,6 @@ spi_device_handle_t spiHandle;
 static lv_obj_t* txt;
 
 //----------------------------------------------------------------------
-// If we are using the built in ILI9341 driver we need to provide these
-// two functions to write data to the display.
-//----------------------------------------------------------------------
-
-//----------------------------------------------------------------------
-// my_lcd_send_cmd
-// ---------------
-// Send short command to the LCD. This function shall wait until the
-// transaction finishes.
-//----------------------------------------------------------------------
-void my_lcd_send_cmd(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size, const uint8_t *param, size_t param_size) {
-  // Prints added for debugging
-  Serial.println("Entering my_lcd_send_cmd");
-  Serial.printf("Sending %d bytes\n", cmd_size);
-  for (int i = 0; i < cmd_size; i++)
-    Serial.printf("%02x ", cmd[i]);
-  Serial.println("");
-
-  spi_transaction_t t = {0};
-  t.length    = cmd_size;
-  t.tx_buffer = cmd;
-  esp_err_t e = spi_device_transmit(spiHandle, &t);
-  if (e != ESP_OK) {
-    Serial.printf("spi_device_transmit() returned %d\n", e);
-  }
-  Serial.println("Leaving my_lcd_send_cmd");
-}
-
-//----------------------------------------------------------------------
-// my_lcd_send_color
-// -----------------
-// Send large array of pixel data to the LCD. If necessary, this
-// function has to do the byte-swapping. This function can do the
-// transfer in the background.
-//----------------------------------------------------------------------
-void my_lcd_send_color(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size, uint8_t *param, size_t param_size) {
-  Serial.println("Entering my_lcd_send_color");
-  spi_transaction_t t = {0};
-  t.length    = cmd_size;
-  t.tx_buffer = cmd;
-  spi_device_transmit(spiHandle, &t);
-  // spi_device_polling_transmit(spiHandle, &t);
-  Serial.println("Leaving my_lcd_send_color");
-}
-
-//----------------------------------------------------------------------
 // InitSPI
 // -------
 // Initialise the SPI bus
@@ -109,8 +63,77 @@ bool InitSPI() {
   // Allocate the buffer used by LVGL. Make it DMA capable.
   drawBuf = (uint8_t*) heap_caps_malloc(DRAW_BUF_SIZE, MALLOC_CAP_DMA);
 
+  // We will need to manually set the DC line
+  pinMode(PIN_DC, OUTPUT);
+
   // Return indicating success
   return true;
+}
+
+//----------------------------------------------------------------------
+// If we are using the built in ILI9341 driver we need to provide these
+// two functions to write data to the display.
+//----------------------------------------------------------------------
+
+//----------------------------------------------------------------------
+// my_lcd_send_cmd
+// ---------------
+// Send short command to the LCD. This function shall wait until the
+// transaction finishes.
+//----------------------------------------------------------------------
+void my_lcd_send_cmd(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size, const uint8_t *param, size_t param_size) {
+  // Send the command byte
+  spi_transaction_t t = {0};
+  t.length    = 1;
+  t.tx_buffer = &cmd;
+  digitalWrite(PIN_DC, LOW); // Set DC low for a command
+  esp_err_t e = spi_device_transmit(spiHandle, &t);
+  if (e != ESP_OK) {
+    Serial.printf("Command spi_device_transmit() returned %d\n", e);
+  }
+
+  // Send the parameters
+  spi_transaction_t p = {0};
+  if (param && param_size > 0) {
+    p.length    = param_size;
+    p.tx_buffer = param;
+    digitalWrite(PIN_DC, HIGH); // Set DC high for data
+    esp_err_t e = spi_device_transmit(spiHandle, &p);
+    if (e != ESP_OK) {
+      Serial.printf("Parameter spi_device_transmit() returned %d\n", e);
+    }
+  }
+}
+
+//----------------------------------------------------------------------
+// my_lcd_send_color
+// -----------------
+// Send large array of pixel data to the LCD. If necessary, this
+// function has to do the byte-swapping. This function can do the
+// transfer in the background.
+//----------------------------------------------------------------------
+void my_lcd_send_color(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size, uint8_t *param, size_t param_size) {
+  // Send the command byte
+  spi_transaction_t t = {0};
+  t.length    = 1;
+  t.tx_buffer = &cmd;
+  digitalWrite(PIN_DC, LOW); // Set DC low for a command
+  esp_err_t e = spi_device_transmit(spiHandle, &t);
+  if (e != ESP_OK) {
+    Serial.printf("Command spi_device_transmit() returned %d\n", e);
+  }
+
+  // Send the parameters
+  spi_transaction_t p = {0};
+  if (param && param_size > 0) {
+    p.length    = param_size;
+    p.tx_buffer = param;
+    digitalWrite(PIN_DC, HIGH); // Set DC high for data
+    esp_err_t e = spi_device_transmit(spiHandle, &p);
+    if (e != ESP_OK) {
+      Serial.printf("Parameter spi_device_transmit() returned %d\n", e);
+    }
+  }
 }
 
 //----------------------------------------------------------------------
@@ -151,6 +174,19 @@ void ProcessInput(const char* Input) {
 }
 
 //----------------------------------------------------------------------
+// LVGLTimerTask
+// -------------
+// This updates the LVGL timer every 5 milliseconds
+//----------------------------------------------------------------------
+void LVGLTimerTask(void* Parameter)
+{
+  while (true) {
+    lv_tick_inc(5);     // tell LVGL how much time has passed
+    delay(5);           // let this time pass
+  }
+}
+
+//----------------------------------------------------------------------
 // setup
 // -----
 //----------------------------------------------------------------------
@@ -159,19 +195,20 @@ void setup() {
   Serial.begin(115200);
   Serial.println(LVGL_Arduino);
 
-  // Turn the backlight on
-  pinMode(PIN_BACKLIGHT, OUTPUT);
-  digitalWrite(PIN_BACKLIGHT, HIGH);
-
   // Initialise the SPI bus
   InitSPI();
   Serial.println("SPI bus initialised");
 
   // Start LVGL
   lv_init();
+  
   // Register print function for debugging
   lv_log_register_print_cb(log_print);
   Serial.println("LVGL initialised");
+
+  // Create the LVGL timer task before we create the display object
+  TaskHandle_t h_timer;
+  xTaskCreate(LVGLTimerTask, "LVGLTimerTask", 4000, NULL, 1, &h_timer);
 
   // Create a display object
   lv_display_t * disp;
@@ -181,13 +218,17 @@ void setup() {
   // LV_LCD_FLAG_MIRROR_Y: Mirrors the display vertically (page address order flip).
   // LV_LCD_FLAG_BGR: Sets the color order to Blue-Green-Red instead of Red-Green-Blue (RGB).
   lv_lcd_flag_t flags = LV_LCD_FLAG_NONE;
-  Serial.println("Creating ILI9341 device");
   disp = lv_ili9341_create(SCREEN_WIDTH, SCREEN_HEIGHT, flags, my_lcd_send_cmd, my_lcd_send_color);
+  lv_display_set_buffers(disp, drawBuf, NULL, DRAW_BUF_SIZE, LV_DISPLAY_RENDER_MODE_PARTIAL);
   Serial.println("ILI9341 device created");
   
   // Function to draw the GUI
   CreateMainGUI();
   Serial.println("GUI created");
+
+  // Finally turn the backlight on
+  pinMode(PIN_BACKLIGHT, OUTPUT);
+  digitalWrite(PIN_BACKLIGHT, HIGH);
 }
 
 //----------------------------------------------------------------------
@@ -195,6 +236,8 @@ void setup() {
 // ----
 //----------------------------------------------------------------------
 void loop() {
+  // If the user has typed anything into the serial monitor we will
+  // append it to the edit control
   if (Serial.available()) {
     // Read a string from the serial monitor
     String s = Serial.readString();
@@ -202,7 +245,7 @@ void loop() {
     ProcessInput(s.c_str());
   }
 
-  lv_task_handler();  // let the GUI do its work
-  lv_tick_inc(5);     // tell LVGL how much time has passed
-  delay(5);           // let this time pass
+  // Check the LVGL task handler
+  lv_task_handler();
+  delay(5);
 }

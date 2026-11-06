@@ -2,6 +2,6 @@
 
 This is an attempt to use the built in ILI9341 driver provided by LVGL.
 
-At the time of writing the code compiles fine but the call to `lv_ili9341_create()` never returns. I cannot work out what the problem is.
+At the moment the code compiles and runs without errors but it is not drawing anything on the display.
 
-I have included the `lv_conf.h` I am using. This needs to be copied to your Arduino IDE libraries directory. Logging is set to "trace"  in an attempt to spot the problem so the serial printout will be verbose.
+[The Espressif documentation for this is here](https://lvgl.io/docs/open/integration/external_display_controllers/ili9341).
