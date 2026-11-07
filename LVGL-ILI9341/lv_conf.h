@@ -101,7 +101,7 @@
  *  - LV_OS_SDL2
  *  - LV_OS_CUSTOM
  */
-#define LV_USE_OS LV_OS_NONE
+#define LV_USE_OS LV_OS_FREERTOS
 
 #if LV_USE_OS == LV_OS_CUSTOM
 /** Custom OS include header */
@@ -802,7 +802,7 @@
  *  - LV_LOG_LEVEL_USER: only logs added by the user
  *  - LV_LOG_LEVEL_NONE: nothing is logged
  */
-#define LV_LOG_LEVEL LV_LOG_LEVEL_INFO
+#define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
 
 /** If not set, the user needs to register a callback with lv_log_register_print_cb(). */
 #define LV_LOG_PRINTF 0
